@@ -12,9 +12,9 @@ export default function Conaltura() {
 
   // Cleanup function to remove all widget elements
   const cleanupWidget = () => {
-    // @ts-expect-error
+    // @ts-expect-error - Voiceflow types not available in window object
     if (window.voiceflow?.chat) {
-      // @ts-expect-error
+      // @ts-expect-error - Voiceflow chat API types not defined
       window.voiceflow.chat.hide();
     }
     const existingElements = document.querySelectorAll('[class^="vfrc"], [data-testid="widget-bubble"]');

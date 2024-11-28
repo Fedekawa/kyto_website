@@ -10,9 +10,9 @@ export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
     // Cleanup Voiceflow widget when route changes
     return () => {
-      // @ts-expect-error
+      // @ts-expect-error - Voiceflow types not available globally
       if (window.voiceflow && window.voiceflow.chat) {
-        // @ts-expect-error
+        // @ts-expect-error - Voiceflow types not available globally
         window.voiceflow.chat.destroy();
       }
     };
