@@ -10,9 +10,9 @@ export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
     // Cleanup Voiceflow widget when route changes
     return () => {
-      // @ts-ignore
+      // @ts-expect-error
       if (window.voiceflow && window.voiceflow.chat) {
-        // @ts-ignore
+        // @ts-expect-error
         window.voiceflow.chat.destroy();
       }
     };

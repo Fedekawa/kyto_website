@@ -12,9 +12,9 @@ export default function Conaltura() {
 
   // Cleanup function to remove all widget elements
   const cleanupWidget = () => {
-    // @ts-ignore
+    // @ts-expect-error
     if (window.voiceflow?.chat) {
-      // @ts-ignore
+      // @ts-expect-error
       window.voiceflow.chat.hide();
     }
     const existingElements = document.querySelectorAll('[class^="vfrc"], [data-testid="widget-bubble"]');

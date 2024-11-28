@@ -25,7 +25,7 @@ export default function Home() {
       vy: (Math.random() - 0.5) * 0.5
     }));
 
-    function animate() {
+    const animate = () => {
       ctx.fillStyle = 'black';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -57,7 +57,7 @@ export default function Home() {
       });
 
       requestAnimationFrame(animate);
-    }
+    };
 
     animate();
     return () => window.removeEventListener('resize', handleResize);
