@@ -96,7 +96,7 @@ export function HeroSection() {
                 placeholder={
                   language === "en" ? "Tell me what you want to automate..." : "Dime qué quieres automatizar..."
                 }
-                className="w-full rounded-full border border-gray-200 bg-white px-6 py-4 pr-14 text-[#002e88] shadow-lg focus:border-[#002e88] focus:outline-none focus:ring-2 focus:ring-[#002e88]/20"
+                className="w-full rounded-full border border-gray-200 bg-white px-6 py-4 pr-14 text-[#002e88] shadow-lg transition-all duration-150 ease-out focus:border-[#002e88] focus:outline-none focus:ring-1 focus:ring-[#002e88]/10"
               />
               <Button
                 type="submit"

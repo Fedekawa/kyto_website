@@ -1,0 +1,26 @@
+{
+  "name": "Kyto - Implementación de IA",
+  "short_name": "Kyto",
+  "description": "Soluciones de IA empresarial para PYMEs",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#002e88",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "lang": "es",
+  "dir": "ltr",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity", "technology"],
+  "prefer_related_applications": false
+} 

@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
-import { Menu, X, MessageSquare } from "lucide-react"
+import { Menu, X } from "lucide-react"
 import { LanguageSwitcher } from "../language-switcher"
 import { useLanguage } from "@/contexts/language-context"
 import { translations } from "@/lib/translations"
@@ -23,8 +23,6 @@ export function Header() {
     { name: t.caseStudies, href: "/#case-studies" },
     { name: t.methodology, href: "/#methodology" },
     { name: t.about, href: "/about" },
-    // Add Chat link
-    { name: language === "en" ? "Chat" : "Chat", href: "/chat" },
   ]
 
   useEffect(() => {
@@ -67,11 +65,8 @@ export function Header() {
                 key={item.name}
                 href={item.href}
                 onClick={handleNavClick}
-                className={`text-[#002e88] hover:text-[#002e88]/80 font-medium transition-colors ${
-                  item.href === "/chat" ? "flex items-center gap-2" : ""
-                }`}
+                className="text-[#002e88] hover:text-[#002e88]/80 font-medium transition-colors"
               >
-                {item.href === "/chat" && <MessageSquare className="h-4 w-4" />}
                 {item.name}
               </Link>
             ))}
@@ -119,7 +114,6 @@ export function Header() {
                     className="block py-2 text-[#002e88] hover:text-[#002e88]/80 font-medium transition-colors"
                   >
                     <span className="flex items-center gap-2">
-                      {item.href === "/chat" && <MessageSquare className="h-4 w-4" />}
                       {item.name}
                     </span>
                   </Link>

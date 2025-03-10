@@ -129,7 +129,7 @@ export const translations: TranslationsType = {
     // Hero Section
     trustedBySMBs: "Trusted by SMBs",
     aiImplementationIn: "AI Implementation in",
-    daysNotMonths: "Days, Not Months",
+    daysNotMonths: "Weeks, Not Months",
     fasterMoreAffordable: "10x Faster, 10x More Affordable AI Solutions for Your Business",
     noCodeImplementation: "No-code implementation",
     resultsInDays: "Results in days",
@@ -141,8 +141,8 @@ export const translations: TranslationsType = {
     theFutureIsHere: "The Future is Here",
     whySMBsChoose: "Why SMBs Choose Our AI Solutions",
     getPowerOfEnterprise: "Get the power of enterprise AI with the simplicity and affordability your business needs",
-    daysNotMonthsTitle: "Days, Not Months",
-    daysNotMonthsDesc: "Deploy complete AI solutions in days instead of the typical months-long implementation cycles.",
+    daysNotMonthsTitle: "Weeks, Not Months",
+    daysNotMonthsDesc: "Deploy complete AI solutions in weeks instead of the typical months-long implementation cycles.",
     fasterDeployment: "10x Faster Deployment",
     costEffective: "Cost Effective",
     costEffectiveDesc:
@@ -187,8 +187,8 @@ export const translations: TranslationsType = {
     week1: "Week 1",
     weeks23: "Weeks 2-3",
     weeks34: "Weeks 3-4",
-    weeks46: "Weeks 4-6",
-    weeks67: "Week 6-7",
+    weeks46: "Weeks 4-5",
+    weeks67: "Weeks 5-6",
     readyToStart: "Ready to start your AI transformation journey?",
     // Contact Section
     startYourAIJourney: "Start Your AI Journey Today",
@@ -244,7 +244,7 @@ export const translations: TranslationsType = {
     // Hero Section
     trustedBySMBs: "Confiado por PYMEs",
     aiImplementationIn: "Implementación de IA en",
-    daysNotMonths: "Días, No Meses",
+    daysNotMonths: "Semanas, No Meses",
     fasterMoreAffordable: "Soluciones de IA 10 veces más rápidas y económicas para tu negocio",
     noCodeImplementation: "Implementación sin código",
     resultsInDays: "Resultados en días",
@@ -257,9 +257,9 @@ export const translations: TranslationsType = {
     whySMBsChoose: "Por Qué las PYMEs Eligen Nuestras Soluciones de IA",
     getPowerOfEnterprise:
       "Obtén el poder de la IA empresarial con la simplicidad y asequibilidad que tu negocio necesita",
-    daysNotMonthsTitle: "Días, No Meses",
+    daysNotMonthsTitle: "Semanas, No Meses",
     daysNotMonthsDesc:
-      "Implementa soluciones completas de IA en días en lugar de los típicos ciclos de implementación de meses.",
+      "Implementa soluciones completas de IA en semanas en lugar de los típicos ciclos de implementación de meses.",
     fasterDeployment: "Implementación 10x Más Rápida",
     costEffective: "Costo Efectivo",
     costEffectiveDesc:
@@ -306,8 +306,8 @@ export const translations: TranslationsType = {
     week1: "Semana 1",
     weeks23: "Semanas 2-3",
     weeks34: "Semanas 3-4",
-    weeks46: "Semanas 4-6",
-    weeks67: "Semana 6-7",
+    weeks46: "Semanas 4-5",
+    weeks67: "Semanas 5-6",
     readyToStart: "¿Listo para comenzar tu viaje de transformación con IA?",
     // Contact Section
     startYourAIJourney: "Comienza Tu Viaje de IA Hoy",

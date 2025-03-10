@@ -1,18 +1,23 @@
 "use client"
 
-import type { ReactNode } from "react"
 import { useState, useRef, useEffect } from "react"
-import { motion } from "framer-motion"
-import { Send, Loader2, Languages } from "lucide-react"
+import { Send, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/language-context"
 import { translations } from "@/lib/translations"
-import { Button } from "@/components/ui/button"
-import { generateText } from "ai"
-import { openai } from "@ai-sdk/openai"
+import { IntegrationDiagram } from "./integration-diagram"
+import { generateChatCompletion, handleIntegrationDiagram, SYSTEM_PROMPT } from "@/lib/openai"
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions"
 
 type Message = {
   role: "user" | "assistant"
   content: string
+  showDiagram?: boolean
+  diagramData?: {
+    input: string
+    output: string
+    description: string
+  }
 }
 
 export function EmbeddedChat() {
@@ -20,7 +25,7 @@ export function EmbeddedChat() {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { language, setLanguage } = useLanguage()
+  const { language } = useLanguage()
   const t = translations[language]
 
   const scrollToBottom = () => {
@@ -31,8 +36,8 @@ export function EmbeddedChat() {
     scrollToBottom()
   }, [messages])
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    e?.preventDefault()
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
 
     if (!input.trim()) return
 
@@ -44,18 +49,47 @@ export function EmbeddedChat() {
     setMessages((prev) => [...prev, { role: "user", content: userMessage }])
 
     try {
+      // Prepare messages for OpenAI
+      const chatMessages: ChatCompletionMessageParam[] = [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        { role: "user", content: userMessage },
+      ]
+
       // Generate response from OpenAI
-      const { text } = await generateText({
-        model: openai("gpt-4o"),
-        prompt: `${userMessage}
+      const completion = await generateChatCompletion(chatMessages)
 
-You are Kyto's AI assistant. Your role is to help potential customers understand how Kyto can automate their business processes. Focus on practical solutions and quick implementation.`,
-        system:
-          "You are an automation expert helping businesses identify processes that can be automated. Keep responses concise and focused on actionable solutions.",
-      })
+      if (!completion) {
+        throw new Error("No completion generated")
+      }
 
-      // Add assistant message to chat
-      setMessages((prev) => [...prev, { role: "assistant", content: text }])
+      // Check for function calls
+      if (completion.function_call) {
+        const diagramData = handleIntegrationDiagram(completion.function_call)
+        
+        // Add assistant message with diagram
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: completion.message.content || "",
+            showDiagram: !!diagramData,
+            diagramData: diagramData || undefined,
+          },
+        ])
+      } else {
+        // Add regular assistant message
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: completion.message.content || "",
+          },
+        ])
+      }
     } catch (error) {
       console.error("Error generating response:", error)
       setMessages((prev) => [
@@ -73,74 +107,49 @@ You are Kyto's AI assistant. Your role is to help potential customers understand
     }
   }
 
-  const toggleLanguage = () => {
-    setLanguage(language === "en" ? "es" : "en")
-  }
-
   return (
-    <div className="mx-auto max-w-4xl w-full">
+    <div className="mx-auto max-w-4xl p-4">
       {/* Chat Messages */}
-      <div className="mb-6 space-y-4 min-h-[400px] max-h-[600px] overflow-y-auto p-4">
-        {messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center text-center text-gray-500">
-            <h2 className="mb-2 text-2xl font-semibold text-primary">
-              {language === "en" ? "What would you like to automate?" : "¿Qué te gustaría automatizar?"}
-            </h2>
-            <p className="text-primary/70">
-              {language === "en"
-                ? "Describe your process and I'll help you find automation opportunities."
-                : "Describe tu proceso y te ayudaré a encontrar oportunidades de automatización."}
-            </p>
-          </div>
-        ) : (
-          messages.map((message, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+      <div className="mb-4 h-[600px] overflow-y-auto rounded-lg border bg-gray-50 p-4">
+        {messages.map((message, index) => (
+          <div key={index} className="mb-4">
+            <div
+              className={`flex max-w-[85%] rounded-lg p-3 ${
+                message.role === "user" ? "ml-auto bg-[#002e88] text-white" : "bg-gray-200 text-[#002e88]"
+              }`}
             >
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                  message.role === "user" ? "bg-primary text-white" : "bg-gray-100 text-primary border border-gray-200"
-                }`}
-              >
-                {message.content}
+              {message.content}
+            </div>
+
+            {/* Integration Diagram */}
+            {message.showDiagram && message.diagramData && (
+              <div className="mt-4 mb-6 p-4 bg-white rounded-lg shadow-sm">
+                <p className="text-sm text-[#002e88] mb-3 font-medium">{message.diagramData.description}</p>
+                <IntegrationDiagram 
+                  input={message.diagramData.input} 
+                  output={message.diagramData.output} 
+                />
               </div>
-            </motion.div>
-          ))
-        )}
+            )}
+          </div>
+        ))}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Chat Input */}
-      <div className="relative">
-        <form onSubmit={handleSendMessage} className="relative flex items-center">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={language === "en" ? "Tell me what you want to automate..." : "Dime qué quieres automatizar..."}
-            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 pr-24 text-primary placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            disabled={isLoading}
-          />
-          <div className="absolute right-2 flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={toggleLanguage}
-              className="h-10 w-10 rounded-full hover:bg-gray-100"
-            >
-              <Languages className="h-5 w-5 text-primary/70" />
-            </Button>
-            <Button type="submit" disabled={isLoading || !input.trim()} className="h-10 w-10 rounded-full p-0">
-              {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-            </Button>
-          </div>
-        </form>
-      </div>
+      <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={t.typeYourMessage}
+          className="flex-1 rounded-lg border border-gray-300 p-2 focus:border-[#002e88] focus:outline-none"
+          disabled={isLoading}
+        />
+        <Button type="submit" disabled={isLoading || !input.trim()}>
+          {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+        </Button>
+      </form>
     </div>
   )
 }

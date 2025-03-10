@@ -1,18 +1,24 @@
 "use client"
 
-import type { ReactNode } from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Send, Loader2, X } from "lucide-react"
+import { X, Send, Loader2, Sparkles, RotateCcw } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/language-context"
 import { translations } from "@/lib/translations"
-import { Button } from "@/components/ui/button"
-import { generateText } from "ai"
-import { openai } from "@ai-sdk/openai"
+import { IntegrationDiagram } from "./integration-diagram"
+import { generateChatCompletion, handleIntegrationDiagram, SYSTEM_PROMPT } from "@/lib/openai"
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions"
 
 type Message = {
   role: "user" | "assistant"
   content: string
+  showDiagram?: boolean
+  diagramData?: {
+    input: string
+    output: string
+    description: string
+  }
 }
 
 interface ChatPopupProps {
@@ -25,31 +31,10 @@ export function ChatPopup({ isOpen, onClose, initialMessage = "" }: ChatPopupPro
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState(initialMessage)
   const [isLoading, setIsLoading] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
   const { language } = useLanguage()
   const t = translations[language]
-
-  // Reset input when initialMessage changes
-  useEffect(() => {
-    if (initialMessage) {
-      setInput(initialMessage)
-    }
-  }, [initialMessage])
-
-  // Focus input when popup opens
-  useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current.focus()
-    }
-  }, [isOpen])
-
-  // Send initial message if provided
-  useEffect(() => {
-    if (isOpen && initialMessage && messages.length === 0) {
-      handleSendMessage(undefined, initialMessage)
-    }
-  }, [isOpen, initialMessage])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -59,31 +44,66 @@ export function ChatPopup({ isOpen, onClose, initialMessage = "" }: ChatPopupPro
     scrollToBottom()
   }, [messages])
 
-  const handleSendMessage = async (e?: React.FormEvent, overrideMessage?: string) => {
+  useEffect(() => {
+    if (initialMessage && messages.length === 0) {
+      handleSendMessage()
+    }
+  }, [])
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault()
 
-    const messageToSend = overrideMessage || input
-    if (!messageToSend.trim()) return
+    if (!input.trim()) return
 
+    const userMessage = input
     setInput("")
     setIsLoading(true)
 
     // Add user message to chat
-    setMessages((prev) => [...prev, { role: "user", content: messageToSend }])
+    setMessages((prev) => [...prev, { role: "user", content: userMessage }])
 
     try {
+      // Prepare messages for OpenAI
+      const chatMessages: ChatCompletionMessageParam[] = [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        { role: "user", content: userMessage },
+      ]
+
       // Generate response from OpenAI
-      const { text } = await generateText({
-        model: openai("gpt-4o"),
-        prompt: `${messageToSend}
+      const completion = await generateChatCompletion(chatMessages)
 
-You are Kyto's AI assistant. Your role is to help potential customers understand how Kyto can automate their business processes. Focus on practical solutions and quick implementation.`,
-        system:
-          "You are an automation expert helping businesses identify processes that can be automated. Keep responses concise and focused on actionable solutions.",
-      })
+      if (!completion) {
+        throw new Error("No completion generated")
+      }
 
-      // Add assistant message to chat
-      setMessages((prev) => [...prev, { role: "assistant", content: text }])
+      // Check for function calls
+      if (completion.function_call) {
+        const diagramData = handleIntegrationDiagram(completion.function_call)
+        
+        // Add assistant message with diagram
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: completion.message.content || "",
+            showDiagram: !!diagramData,
+            diagramData: diagramData || undefined,
+          },
+        ])
+      } else {
+        // Add regular assistant message
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: completion.message.content || "",
+          },
+        ])
+      }
     } catch (error) {
       console.error("Error generating response:", error)
       setMessages((prev) => [
@@ -101,132 +121,159 @@ You are Kyto's AI assistant. Your role is to help potential customers understand
     }
   }
 
-  // Handle escape key to close popup
-  useEffect(() => {
-    const handleEscKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose()
-      }
+  const handleReset = async () => {
+    setIsResetting(true)
+    try {
+      // Clear all messages
+      setMessages([])
+      setInput("")
+      // Add a small delay to show the reset animation
+      await new Promise(resolve => setTimeout(resolve, 500))
+    } finally {
+      setIsResetting(false)
     }
-
-    window.addEventListener("keydown", handleEscKey)
-    return () => window.removeEventListener("keydown", handleEscKey)
-  }, [isOpen, onClose])
-
-  // Prevent body scrolling when popup is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden"
-    } else {
-      document.body.style.overflow = ""
-    }
-    return () => {
-      document.body.style.overflow = ""
-    }
-  }, [isOpen])
+  }
 
   return (
-    <div className={`${isOpen ? "fixed inset-0 z-50 flex items-center justify-center" : "hidden"}`}>
-      <AnimatePresence>
-        {isOpen && (
-          <>
-            {/* Backdrop */}
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            onClick={onClose}
+          >
+            {/* Chat Window */}
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={onClose}
-            />
-
-            {/* Chat Popup */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative w-[95%] max-w-2xl rounded-xl bg-white shadow-2xl overflow-hidden"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ 
+                type: "spring",
+                stiffness: 500,
+                damping: 30,
+                duration: 0.15
+              }}
+              className="relative w-[95%] max-w-3xl rounded-2xl bg-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden font-sans"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Chat Header */}
-              <div className="flex items-center justify-between border-b border-gray-200 p-4">
-                <h3 className="text-lg font-semibold text-primary">
-                  {language === "en" ? "AI Automation Assistant" : "Asistente de Automatización IA"}
-                </h3>
-                <button
-                  onClick={onClose}
-                  className="rounded-full p-1 text-gray-500 hover:bg-gray-100 transition-colors"
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+              <div className="flex items-center justify-between bg-gradient-to-r from-[#002e88] to-[#1a4cad] p-6 text-white">
+                <h3 className="text-xl font-semibold tracking-tight">{t.chatWithKyto}</h3>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleReset}
+                    disabled={messages.length === 0 || isResetting}
+                    className="rounded-full p-2.5 hover:bg-white/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm bg-white/10"
+                    title={language === "en" ? "Reset conversation" : "Reiniciar conversación"}
+                  >
+                    <RotateCcw className={`h-5 w-5 ${isResetting ? "animate-spin" : ""}`} />
+                  </button>
+                  <button 
+                    onClick={onClose} 
+                    className="rounded-full p-2.5 hover:bg-white/20 transition-all duration-200 backdrop-blur-sm bg-white/10"
+                    title={language === "en" ? "Close chat" : "Cerrar chat"}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Chat Messages */}
-              <div className="max-h-[70vh] h-[400px] overflow-y-auto p-4 md:p-6">
+              <div className="h-[70vh] overflow-y-auto p-6 bg-gradient-to-b from-gray-50 to-white">
                 {messages.length === 0 ? (
                   <div className="flex h-full flex-col items-center justify-center text-center text-gray-500">
-                    <h2 className="mb-2 text-xl font-semibold text-primary">
-                      {language === "en" ? "What would you like to automate?" : "¿Qué te gustaría automatizar?"}
-                    </h2>
-                    <p className="text-primary/70 max-w-md">
-                      {language === "en"
-                        ? "Describe your process and I'll help you find automation opportunities."
-                        : "Describe tu proceso y te ayudaré a encontrar oportunidades de automatización."}
-                    </p>
+                    <div className="rounded-full bg-gradient-to-br from-[#002e88]/5 to-[#1a4cad]/5 p-6">
+                      <Sparkles className="h-16 w-16 text-[#002e88]/40" />
+                    </div>
+                    <p className="mt-6 mb-3 text-2xl font-medium text-[#002e88] tracking-tight">{t.chatWelcomeTitle}</p>
+                    <p className="text-base text-[#002e88]/70 max-w-md leading-relaxed">{t.chatWelcomeMessage}</p>
                   </div>
                 ) : (
                   messages.map((message, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className={`mb-4 flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                          message.role === "user"
-                            ? "bg-primary text-white"
-                            : "bg-gray-100 text-primary border border-gray-200"
-                        }`}
-                      >
-                        {message.content}
-                      </div>
-                    </motion.div>
+                    <div key={index} className="mb-6">
+                      {/* Only show message bubble if there's content */}
+                      {message.content && (
+                        <div
+                          className={`flex max-w-[85%] rounded-2xl p-4 shadow-sm ${
+                            message.role === "user" 
+                              ? "ml-auto bg-gradient-to-br from-[#002e88]/90 to-[#1a4cad]/90 text-white backdrop-blur-sm" 
+                              : "bg-white shadow-md border border-gray-100 text-[#002e88]"
+                          }`}
+                        >
+                          <div className="prose prose-sm leading-relaxed">
+                            {message.content.split('\n').map((paragraph, i) => {
+                              // Handle numbered lists
+                              if (paragraph.match(/^\d+\./)) {
+                                return (
+                                  <p key={i} className="mb-2">
+                                    {paragraph.split('**').map((part, j) => (
+                                      j % 2 === 1 ? <strong key={j}>{part}</strong> : part
+                                    ))}
+                                  </p>
+                                );
+                              }
+                              // Handle regular paragraphs
+                              return (
+                                <p key={i} className="mb-2 last:mb-0">
+                                  {paragraph.split('**').map((part, j) => (
+                                    j % 2 === 1 ? <strong key={j}>{part}</strong> : part
+                                  ))}
+                                </p>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Integration Diagram - make it match message width */}
+                      {message.showDiagram && message.diagramData && (
+                        <div className="mt-4 mb-6 max-w-[85%] bg-white rounded-2xl shadow-md border border-gray-100">
+                          <p className="text-sm text-[#002e88] p-4 font-medium tracking-tight border-b border-gray-100">
+                            {message.diagramData.description}
+                          </p>
+                          <div className="p-4">
+                            <IntegrationDiagram 
+                              input={message.diagramData.input} 
+                              output={message.diagramData.output} 
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ))
                 )}
                 <div ref={messagesEndRef} />
               </div>
 
               {/* Chat Input */}
-              <div className="border-t border-gray-200 p-3 md:p-4">
-                <form onSubmit={handleSendMessage} className="relative flex items-center">
+              <form onSubmit={handleSendMessage} className="border-t border-gray-100 p-6 bg-white">
+                <div className="flex items-center gap-3">
                   <input
-                    ref={inputRef}
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={
-                      language === "en" ? "Tell me what you want to automate..." : "Dime qué quieres automatizar..."
-                    }
-                    className="w-full rounded-full border border-gray-200 bg-gray-50 px-4 py-3 pr-12 text-primary placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder={t.typeYourMessage}
+                    className="flex-1 rounded-xl border border-gray-200 p-4 text-base focus:border-[#002e88] focus:outline-none focus:ring-2 focus:ring-[#002e88]/10 transition-all duration-200"
                     disabled={isLoading}
                   />
-                  <Button
-                    type="submit"
-                    disabled={isLoading || !input.trim()}
-                    className="absolute right-1 h-10 w-10 rounded-full p-0"
+                  <Button 
+                    type="submit" 
+                    disabled={isLoading || !input.trim()} 
+                    className="h-14 w-14 rounded-xl p-0 bg-gradient-to-br from-[#002e88] to-[#1a4cad] hover:opacity-90 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
                   >
-                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                    {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Send className="h-6 w-6" />}
                   </Button>
-                </form>
-              </div>
+                </div>
+              </form>
             </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   )
 }
 

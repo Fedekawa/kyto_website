@@ -1,16 +1,15 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MessageSquare, X, Send, Loader2, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/language-context"
 import { translations } from "@/lib/translations"
-import { generateText } from "ai"
-import { openai } from "@ai-sdk/openai"
 import { IntegrationDiagram } from "./integration-diagram"
+import { generateChatCompletion, handleIntegrationDiagram, SYSTEM_PROMPT } from "@/lib/openai"
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions"
 
 type Message = {
   role: "user" | "assistant"
@@ -19,6 +18,7 @@ type Message = {
   diagramData?: {
     input: string
     output: string
+    description: string
   }
 }
 
@@ -58,36 +58,47 @@ export function AiChat() {
     setMessages((prev) => [...prev, { role: "user", content: userMessage }])
 
     try {
-      // Check if the message is about integration
-      const isIntegrationQuestion =
-        userMessage.toLowerCase().includes("integration") ||
-        userMessage.toLowerCase().includes("connect") ||
-        userMessage.toLowerCase().includes("workflow") ||
-        userMessage.toLowerCase().includes("process")
+      // Prepare messages for OpenAI
+      const chatMessages: ChatCompletionMessageParam[] = [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        { role: "user", content: userMessage },
+      ]
 
       // Generate response from OpenAI
-      const { text } = await generateText({
-        model: openai("gpt-4o"),
-        prompt: `${userMessage}\n\nYou are an AI assistant for Kyto, an AI implementation and RPA agency. Keep responses concise and helpful. Focus on Kyto's services for implementing AI solutions quickly and affordably.`,
-        system:
-          "You are Kyto's AI assistant. Your role is to help potential customers understand Kyto's services. Kyto specializes in rapid AI implementation for businesses, offering solutions in days rather than months. They focus on document processing, AI agents, and process automation. Keep responses under 120 words.",
-      })
+      const completion = await generateChatCompletion(chatMessages)
 
-      // Add assistant message to chat
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: text,
-          showDiagram: isIntegrationQuestion,
-          diagramData: isIntegrationQuestion
-            ? {
-                input: "WhatsApp",
-                output: "CRM",
-              }
-            : undefined,
-        },
-      ])
+      if (!completion) {
+        throw new Error("No completion generated")
+      }
+
+      // Check for function calls
+      if (completion.function_call) {
+        const diagramData = handleIntegrationDiagram(completion.function_call)
+        
+        // Add assistant message with diagram
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: completion.message.content || "",
+            showDiagram: !!diagramData,
+            diagramData: diagramData || undefined,
+          },
+        ])
+      } else {
+        // Add regular assistant message
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: completion.message.content || "",
+          },
+        ])
+      }
     } catch (error) {
       console.error("Error generating response:", error)
       setMessages((prev) => [
@@ -157,8 +168,11 @@ export function AiChat() {
                     {/* Integration Diagram */}
                     {message.showDiagram && message.diagramData && (
                       <div className="mt-4 mb-6 p-4 bg-white rounded-lg shadow-sm">
-                        <p className="text-sm text-[#002e88] mb-3 font-medium">{t.integrationExample}:</p>
-                        <IntegrationDiagram input={message.diagramData.input} output={message.diagramData.output} />
+                        <p className="text-sm text-[#002e88] mb-3 font-medium">{message.diagramData.description}</p>
+                        <IntegrationDiagram 
+                          input={message.diagramData.input} 
+                          output={message.diagramData.output} 
+                        />
                       </div>
                     )}
                   </div>
